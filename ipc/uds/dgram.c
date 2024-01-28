@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 
-#define BUFSZ 1024
+#define BUFSZ 65536
 int main() {
     int sockets[2];
 
@@ -15,8 +15,16 @@ int main() {
     }
 
     pid_t pid;
-    char buf[BUFSZ];
+    int n_elems;
+    n_elems = BUFSZ/sizeof(double);
+    double buf[n_elems];
     int rval;
+
+    // dummy data
+    double data[n_elems];
+    for(int i = 0; i < n_elems; i++) {
+        data[i] = (double)i;
+    }
 
     if (signal(SIGCHLD, SIG_IGN) == SIG_ERR) {
         fprintf(stderr, "couldn't set signal handler\n");
@@ -28,18 +36,18 @@ int main() {
             fprintf(stderr, "couldn't fork process\n");
             exit(EXIT_FAILURE);
         case 0:
-            fprintf(stderr, "child proc exiting...\n");
             close(sockets[1]);
-            if (write(sockets[0], "PING", sizeof("PING")) < 0) {
+            if (write(sockets[0], data, sizeof(data)) < 0) {
                 fprintf(stderr, "couldn't write msg to socket\n");
                 exit(EXIT_FAILURE);
             }
-            if (read(sockets[0], buf, BUFSZ) < 0) {
+            if (read(sockets[0], buf, sizeof(buf)) < 0) {
                 fprintf(stderr, "couldn't read msg from socket\n");
                 exit(EXIT_FAILURE);
             }
-            fprintf(stderr, "-->%s\n", buf);
+            fprintf(stderr, "received data from server of size %d\n", sizeof(buf));
             close(sockets[0]);
+            fprintf(stderr, "child proc exiting...\n");
             exit(EXIT_SUCCESS);
         default:
             fprintf(stderr, "parent proc. child proc PID %jd.\n", (intmax_t) pid);
@@ -49,10 +57,8 @@ int main() {
                 exit(EXIT_FAILURE);
             }
             if (rval == 0) {
-                // Ensure buffer is 0-terminated.
-                buf[sizeof(buf) - 1] = 0;
-                fprintf(stderr, "-->%s\n", buf);
-                if (write(sockets[1], "PONG", sizeof ("PONG")) < 0) {
+                fprintf(stderr, "received data from client of size %d\n", sizeof(buf));
+                if (write(sockets[1], &data, sizeof(data)) < 0) {
                     fprintf(stderr, "couldn't write to socket\n");
                     exit(EXIT_FAILURE);
                 }
