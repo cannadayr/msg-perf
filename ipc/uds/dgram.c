@@ -6,19 +6,36 @@
 #include <sys/socket.h>
 
 #define BUFSZ 65536
-int main() {
+
+typedef struct {
+    int sender;
+    int receiver;
+} socket_pair;
+
+socket_pair create_dgram_pair() {
     int sockets[2];
+    socket_pair spair;
 
     if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockets) < 0) {
         fprintf(stderr, "couldn't create socket pair\n");
         exit(EXIT_FAILURE);
     }
 
+    spair.sender = sockets[0];
+    spair.receiver = sockets[1];
+    return spair;
+}
+
+int main() {
+
     pid_t pid;
     int n_elems;
     n_elems = BUFSZ/sizeof(double);
     double buf[n_elems];
     int rval;
+
+    socket_pair spair;
+    spair = create_dgram_pair();
 
     // dummy data
     double data[n_elems];
@@ -36,33 +53,33 @@ int main() {
             fprintf(stderr, "couldn't fork process\n");
             exit(EXIT_FAILURE);
         case 0:
-            close(sockets[1]);
-            if (write(sockets[0], data, sizeof(data)) < 0) {
+            close(spair.receiver);
+            if (write(spair.sender, data, sizeof(data)) < 0) {
                 fprintf(stderr, "couldn't write msg to socket\n");
                 exit(EXIT_FAILURE);
             }
-            if (read(sockets[0], buf, sizeof(buf)) < 0) {
+            if (read(spair.sender, buf, sizeof(buf)) < 0) {
                 fprintf(stderr, "couldn't read msg from socket\n");
                 exit(EXIT_FAILURE);
             }
             fprintf(stderr, "received data from server of size %d\n", sizeof(buf));
-            close(sockets[0]);
+            close(spair.sender);
             fprintf(stderr, "child proc exiting...\n");
             exit(EXIT_SUCCESS);
         default:
             fprintf(stderr, "parent proc. child proc PID %jd.\n", (intmax_t) pid);
-            close(sockets[0]);
-            if (rval = read(sockets[1], buf, sizeof(buf)) < 0) {
+            close(spair.sender);
+            if (rval = read(spair.receiver, buf, sizeof(buf)) < 0) {
                 fprintf(stderr, "couldn't read buffer\n");
                 exit(EXIT_FAILURE);
             }
             if (rval == 0) {
                 fprintf(stderr, "received data from client of size %d\n", sizeof(buf));
-                if (write(sockets[1], &data, sizeof(data)) < 0) {
+                if (write(spair.receiver, &data, sizeof(data)) < 0) {
                     fprintf(stderr, "couldn't write to socket\n");
                     exit(EXIT_FAILURE);
                 }
-                close(sockets[1]);
+                close(spair.receiver);
                 exit(EXIT_SUCCESS);
             }
 
