@@ -26,6 +26,14 @@ socket_pair create_dgram_pair() {
     return spair;
 }
 
+double* create_dummy_data(int n_elems) {
+    double* data = malloc(n_elems*sizeof(double));
+    for(int i = 0; i < n_elems; i++) {
+        data[i] = (double)i;
+    }
+    return data;
+}
+
 int main() {
 
     pid_t pid;
@@ -37,11 +45,8 @@ int main() {
     socket_pair spair;
     spair = create_dgram_pair();
 
-    // dummy data
-    double data[n_elems];
-    for(int i = 0; i < n_elems; i++) {
-        data[i] = (double)i;
-    }
+    double* data;
+    data = create_dummy_data(n_elems);
 
     if (signal(SIGCHLD, SIG_IGN) == SIG_ERR) {
         fprintf(stderr, "couldn't set signal handler\n");
